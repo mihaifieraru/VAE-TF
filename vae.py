@@ -45,6 +45,7 @@ flags.DEFINE_boolean('TRAIN', True, 'If False, uses saved parameters instead of 
 flags.DEFINE_boolean('TEST', True, 'If False, does not do testing')
 
 
+flags.DEFINE_integer('NO_IMG_TO_SHOW', 10, 'Number of images to show in tensorboard')
 
 # In[5]:
 
@@ -115,6 +116,13 @@ train_it = tf.train.AdagradOptimizer(learning_rate=FLAGS.ADAGRAD_LR).minimize(lo
 
 # Summaries
 loss_summ = tf.scalar_summary("loss", loss)
+
+reshaped_x_init = tf.reshape(x, [FLAGS.MINIBATCH_SIZE, 28, 28, 1])
+image_input_summ = tf.image_summary("image_input", reshaped_x_init, FLAGS.NO_IMG_TO_SHOW)
+
+reshaped_x_dec = tf.reshape(x_dec, [FLAGS.MINIBATCH_SIZE, 28, 28, 1])
+image_dec_summ = tf.image_summary("image_dec", reshaped_x_dec, FLAGS.NO_IMG_TO_SHOW)
+
 summary = tf.merge_all_summaries()
 
 
@@ -142,8 +150,8 @@ with tf.Session() as sess:
         
         for it in xrange(FLAGS.NUMBER_ITERATIONS):
             minibatch = mnist.train.next_batch(FLAGS.MINIBATCH_SIZE)[0]
-            cur_train_it, cur_summary, cur_loss = sess.run([train_it, summary, loss], feed_dict={x: minibatch})
-            summary_writer.add_summary(cur_summary, it)
+            cur_train_it, cur_loss_summ, cur_loss = sess.run([train_it, loss_summ, loss], feed_dict={x: minibatch})
+            summary_writer.add_summary(cur_loss_summ, it)
 
             if (it + 1) % 50 == 0 or (it + 1) == FLAGS.NUMBER_ITERATIONS:
                 saver.save(sess, FLAGS.MODEL_PATH)
@@ -159,16 +167,10 @@ with tf.Session() as sess:
             print("Model restored.")
             
             x_init = mnist.test.next_batch(FLAGS.MINIBATCH_SIZE)[0]
-            x_decoder = sess.run([x_dec], feed_dict={x: x_init})
+            cur_x_dec, cur_image_input_summ, cur_image_dec_summ = sess.run([x_dec, image_input_summ, image_dec_summ], feed_dict={x: x_init})
             
-            for it in xrange(FLAGS.MINIBATCH_SIZE):
-                img_init = x_init[it].reshape((28, 28))
-                img_init = Image.fromarray(img_init, "L")
-                img_init.save("output/{0}-init.jpeg".format(it+1))
-                
-                img_dec = x_decoder[0][it].reshape((28, 28))            
-                img_dec = Image.fromarray(img_dec, "L")
-                img_dec.save("output/{0}-dec.jpeg".format(it+1))
+            summary_writer.add_summary(cur_image_input_summ)
+            summary_writer.add_summary(cur_image_dec_summ)
                 
                 
             
