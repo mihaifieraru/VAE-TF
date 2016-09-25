@@ -1,3 +1,5 @@
 logs/*
 models/*
 .ipynb_checkpoints/*
+*.DS_Store
+*.jpeg
