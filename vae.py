@@ -17,6 +17,7 @@ from tensorflow.examples.tutorials.mnist import input_data
 # In[3]:
 
 import tensorflow as tf
+import numpy as np
 import os
 from PIL import Image
 
@@ -46,6 +47,7 @@ flags.DEFINE_boolean('TEST', True, 'If False, does not do testing')
 
 
 flags.DEFINE_integer('NO_IMG_TO_SHOW', 10, 'Number of images to show in tensorboard')
+flags.DEFINE_integer('NUMBER_IMAGES_GENERATED', 5, 'Number of images to generate from noise')
 
 # In[5]:
 
@@ -123,6 +125,9 @@ image_input_summ = tf.image_summary("image_input", reshaped_x_init, FLAGS.NO_IMG
 reshaped_x_dec = tf.reshape(x_dec, [FLAGS.MINIBATCH_SIZE, 28, 28, 1])
 image_dec_summ = tf.image_summary("image_dec", reshaped_x_dec, FLAGS.NO_IMG_TO_SHOW)
 
+reshaped_x_gen = tf.reshape(x_dec, [FLAGS.NUMBER_IMAGES_GENERATED, 28, 28, 1])
+image_gen_summ = tf.image_summary("image_gen", reshaped_x_gen, FLAGS.NUMBER_IMAGES_GENERATED)
+
 summary = tf.merge_all_summaries()
 
 
@@ -172,20 +177,12 @@ with tf.Session() as sess:
             summary_writer.add_summary(cur_image_input_summ)
             summary_writer.add_summary(cur_image_dec_summ)
                 
-                
+            print("Generating images.")
+            z_noise = np.random.randn(FLAGS.NUMBER_IMAGES_GENERATED,FLAGS.LATENT_SPACE_SIZE)
+            x_generated, cur_image_gen_summ = sess.run([x_dec, image_gen_summ], feed_dict={z: z_noise})
             
+            summary_writer.add_summary(cur_image_gen_summ)
+
             
-        print("")
-            
-    
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
+        print("Done.\n")    
 
