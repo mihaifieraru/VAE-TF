@@ -43,11 +43,12 @@ flags.DEFINE_integer('NUMBER_ITERATIONS', 100000, 'Number of iterations for opti
 flags.DEFINE_float('INIT_STD_DEV', 0.01, 'Standard deviation for the truncated normal used for initializing the weights')
 
 flags.DEFINE_boolean('TRAIN', True, 'If False, uses saved parameters instead of training')
-flags.DEFINE_boolean('TEST', True, 'If False, does not do testing')
+flags.DEFINE_boolean('TEST_THE_TRAINING', True, 'If False, it is not testing the training')
+flags.DEFINE_boolean('GENERATE', True, 'If False, does not generate new images')
 
 
-flags.DEFINE_integer('NO_IMG_TO_SHOW', 10, 'Number of images to show in tensorboard')
-flags.DEFINE_integer('NUMBER_IMAGES_GENERATED', 5, 'Number of images to generate from noise')
+flags.DEFINE_integer('NUMBER_IMAGES_TEST_THE_TRAINING', 5, 'Number of images to show in tensorboard')
+flags.DEFINE_integer('NUMBER_IMAGES_GENERATED', 100, 'Number of images to generate from noise')
 
 # In[5]:
 
@@ -121,10 +122,10 @@ train_it = tf.train.AdagradOptimizer(learning_rate=FLAGS.ADAGRAD_LR).minimize(lo
 loss_summ = tf.scalar_summary("loss", loss)
 
 reshaped_x_init = tf.reshape(x, [FLAGS.MINIBATCH_SIZE, 28, 28, 1])
-image_input_summ = tf.image_summary("input", reshaped_x_init, FLAGS.NO_IMG_TO_SHOW)
+image_input_summ = tf.image_summary("input", reshaped_x_init, FLAGS.NUMBER_IMAGES_TEST_THE_TRAINING)
 
 reshaped_x_dec = tf.reshape(x_dec, [FLAGS.MINIBATCH_SIZE, 28, 28, 1])
-image_dec_summ = tf.image_summary("decoded", reshaped_x_dec, FLAGS.NO_IMG_TO_SHOW)
+image_dec_summ = tf.image_summary("decoded", reshaped_x_dec, FLAGS.NUMBER_IMAGES_TEST_THE_TRAINING)
 
 reshaped_x_gen = tf.reshape(x_dec, [FLAGS.NUMBER_IMAGES_GENERATED, 28, 28, 1])
 image_gen_summ = tf.image_summary("generated", reshaped_x_gen, FLAGS.NUMBER_IMAGES_GENERATED)
@@ -164,26 +165,32 @@ with tf.Session() as sess:
                 print("Iteration {0} | Loss: {1}".format(it + 1, cur_loss))
         print("")
         
-    if FLAGS.TEST:
-        print("Testing phase.")
+    if FLAGS.TEST_THE_TRAINING:
+        print("Testing the training phase.")
         if not os.path.isfile(FLAGS.MODEL_PATH):
             print("No model found. Please add training phase.")
         else:    
             saver.restore(sess, FLAGS.MODEL_PATH)
-            print("Model restored.")
+            print("Model restored for testing the training.")
             
             x_init = mnist.test.next_batch(FLAGS.MINIBATCH_SIZE)[0]
-            cur_x_dec, cur_image_input_summ, cur_image_dec_summ = sess.run([x_dec, image_input_summ, image_dec_summ], feed_dict={x: x_init})
-
+            cur_image_input_summ, cur_image_dec_summ = sess.run([image_input_summ, image_dec_summ], feed_dict={x: x_init})
             summary_writer.add_summary(cur_image_input_summ)
             summary_writer.add_summary(cur_image_dec_summ)
                 
-            print("Generating images.")
+    if FLAGS.GENERATE:
+        print("Generate images phase.")
+        if not os.path.isfile(FLAGS.MODEL_PATH):
+            print("No model found. Please add training phase.")
+        else:
+            saver.restore(sess, FLAGS.MODEL_PATH)
+            print("Model restored for generating new images.")
+
             z_noise = np.random.randn(FLAGS.NUMBER_IMAGES_GENERATED,FLAGS.LATENT_SPACE_SIZE)
-            x_generated, cur_image_gen_summ = sess.run([x_dec, image_gen_summ], feed_dict={z: z_noise})
-            
+            cur_image_gen_summ = sess.run(image_gen_summ, feed_dict={z: z_noise})
             summary_writer.add_summary(cur_image_gen_summ)
 
+
             
-        print("Done.\n")    
+    print("Done.\n")    
 
