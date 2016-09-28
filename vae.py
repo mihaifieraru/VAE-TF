@@ -38,7 +38,7 @@ flags.DEFINE_integer('LATENT_SPACE_SIZE', 20, 'Size of the latent space ')
 
 flags.DEFINE_float('ADAGRAD_LR', 0.01, 'Learning rate Adagrad')   # Try with {0.01, 0.02, 0.1}
 flags.DEFINE_integer('MINIBATCH_SIZE', 100, 'Size of minibatch')
-flags.DEFINE_integer('NUMBER_ITERATIONS', 1000, 'Number of iterations for optimization')
+flags.DEFINE_integer('NUMBER_ITERATIONS', 100000, 'Number of iterations for optimization')
 
 flags.DEFINE_float('INIT_STD_DEV', 0.01, 'Standard deviation for the truncated normal used for initializing the weights')
 
@@ -79,11 +79,11 @@ h_enc = tf.tanh(tf.add(tf.matmul(x, W_x_h_enc), b_x_h_enc))
 
 W_h_mu_enc = create_W([FLAGS.HIDDEN_ENCODER_SIZE, FLAGS.LATENT_SPACE_SIZE])
 b_h_mu_enc = create_b([FLAGS.LATENT_SPACE_SIZE])
-mu_enc = tf.tanh(tf.add(tf.matmul(h_enc, W_h_mu_enc), b_h_mu_enc))
+mu_enc = tf.add(tf.matmul(h_enc, W_h_mu_enc), b_h_mu_enc)
 
 W_h_logsigma2_enc = create_W([FLAGS.HIDDEN_ENCODER_SIZE, FLAGS.LATENT_SPACE_SIZE])
 b_h_logsigma2_enc = create_b([FLAGS.LATENT_SPACE_SIZE])
-logsigma2_enc = tf.tanh(tf.add(tf.matmul(h_enc, W_h_logsigma2_enc), b_h_logsigma2_enc))
+logsigma2_enc = tf.add(tf.matmul(h_enc, W_h_logsigma2_enc), b_h_logsigma2_enc)
 
 # Sampler
 eps_enc = tf.random_normal(shape=tf.shape(mu_enc))
