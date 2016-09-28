@@ -95,11 +95,12 @@ W_z_h_dec = create_W([FLAGS.LATENT_SPACE_SIZE, FLAGS.HIDDEN_DECODER_SIZE])
 b_z_h_dec = create_b([FLAGS.HIDDEN_DECODER_SIZE])
 h_dec = tf.tanh(tf.add(tf.matmul(z, W_z_h_dec), b_z_h_dec))
 
-W_h_x_dec = create_W([FLAGS.HIDDEN_DECODER_SIZE, FLAGS.INPUT_SIZE])
-b_h_x_dec = create_b([FLAGS.INPUT_SIZE])
-x_dec = tf.add(tf.matmul(h_dec, W_h_x_dec), b_h_x_dec)
+W_h_y_dec = create_W([FLAGS.HIDDEN_DECODER_SIZE, FLAGS.INPUT_SIZE])
+b_h_y_dec = create_b([FLAGS.INPUT_SIZE])
+y_dec = tf.add(tf.matmul(h_dec, W_h_y_dec), b_h_y_dec)
+x_dec = tf.sigmoid(y_dec)
 
-log_p_x_z = tf.reduce_sum(-tf.nn.sigmoid_cross_entropy_with_logits(x_dec, x), reduction_indices=1)
+log_p_x_z = tf.reduce_sum(-tf.nn.sigmoid_cross_entropy_with_logits(y_dec, x), reduction_indices=1)
 KL_q_z_x_vs_p_z = - 0.5 * tf.reduce_sum(1 + logsigma2_enc - tf.square(mu_enc) - tf.square(sigma_enc) , reduction_indices=1)
 
 
@@ -120,13 +121,13 @@ train_it = tf.train.AdagradOptimizer(learning_rate=FLAGS.ADAGRAD_LR).minimize(lo
 loss_summ = tf.scalar_summary("loss", loss)
 
 reshaped_x_init = tf.reshape(x, [FLAGS.MINIBATCH_SIZE, 28, 28, 1])
-image_input_summ = tf.image_summary("image_input", reshaped_x_init, FLAGS.NO_IMG_TO_SHOW)
+image_input_summ = tf.image_summary("input", reshaped_x_init, FLAGS.NO_IMG_TO_SHOW)
 
 reshaped_x_dec = tf.reshape(x_dec, [FLAGS.MINIBATCH_SIZE, 28, 28, 1])
-image_dec_summ = tf.image_summary("image_dec", reshaped_x_dec, FLAGS.NO_IMG_TO_SHOW)
+image_dec_summ = tf.image_summary("decoded", reshaped_x_dec, FLAGS.NO_IMG_TO_SHOW)
 
 reshaped_x_gen = tf.reshape(x_dec, [FLAGS.NUMBER_IMAGES_GENERATED, 28, 28, 1])
-image_gen_summ = tf.image_summary("image_gen", reshaped_x_gen, FLAGS.NUMBER_IMAGES_GENERATED)
+image_gen_summ = tf.image_summary("generated", reshaped_x_gen, FLAGS.NUMBER_IMAGES_GENERATED)
 
 summary = tf.merge_all_summaries()
 
@@ -173,7 +174,7 @@ with tf.Session() as sess:
             
             x_init = mnist.test.next_batch(FLAGS.MINIBATCH_SIZE)[0]
             cur_x_dec, cur_image_input_summ, cur_image_dec_summ = sess.run([x_dec, image_input_summ, image_dec_summ], feed_dict={x: x_init})
-            
+
             summary_writer.add_summary(cur_image_input_summ)
             summary_writer.add_summary(cur_image_dec_summ)
                 
