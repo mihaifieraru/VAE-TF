@@ -38,7 +38,7 @@ flags.DEFINE_integer('LATENT_SPACE_SIZE', 20, 'Size of the latent space ')
 
 flags.DEFINE_float('ADAGRAD_LR', 0.01, 'Learning rate Adagrad')   # Try with {0.01, 0.02, 0.1}
 flags.DEFINE_integer('MINIBATCH_SIZE', 100, 'Size of minibatch')
-flags.DEFINE_integer('NUMBER_ITERATIONS', 100000, 'Number of iterations for optimization')
+flags.DEFINE_integer('NUMBER_ITERATIONS', 10000, 'Number of iterations for optimization')
 
 flags.DEFINE_float('INIT_STD_DEV', 0.01, 'Standard deviation for the truncated normal used for initializing the weights')
 
@@ -126,14 +126,16 @@ train_it = tf.train.AdagradOptimizer(learning_rate=FLAGS.ADAGRAD_LR).minimize(lo
 # Summaries
 loss_summ = tf.scalar_summary("loss", loss)
 
+# Display decoded and initial image side by side
 reshaped_x_init = tf.reshape(x, [FLAGS.MINIBATCH_SIZE, 28, 28, 1])
-image_input_summ = tf.image_summary("input", reshaped_x_init, FLAGS.NUMBER_IMAGES_TEST_THE_TRAINING)
-
 reshaped_x_dec = tf.reshape(x_dec, [FLAGS.MINIBATCH_SIZE, 28, 28, 1])
-image_dec_summ = tf.image_summary("decoded", reshaped_x_dec, FLAGS.NUMBER_IMAGES_TEST_THE_TRAINING)
+reshaped_x_side_dec = tf.concat(2, [reshaped_x_init, reshaped_x_dec])
+image_side_dec_summ = tf.image_summary("decoded_vs_init", reshaped_x_side_dec, FLAGS.NUMBER_IMAGES_TEST_THE_TRAINING)
 
+# Display generated image
 reshaped_x_gen = tf.reshape(x_dec, [FLAGS.NUMBER_IMAGES_GENERATED, 28, 28, 1])
 image_gen_summ = tf.image_summary("generated", reshaped_x_gen, FLAGS.NUMBER_IMAGES_GENERATED)
+
 
 summary = tf.merge_all_summaries()
 
@@ -181,9 +183,8 @@ with tf.Session() as sess:
             print("Model restored for testing the training.")
             
             x_init = mnist.test.next_batch(FLAGS.MINIBATCH_SIZE)[0]
-            cur_image_input_summ, cur_image_dec_summ = sess.run([image_input_summ, image_dec_summ], feed_dict={x: x_init})
-            summary_writer.add_summary(cur_image_input_summ)
-            summary_writer.add_summary(cur_image_dec_summ)
+            cur_image_side_dec_summ = sess.run(image_side_dec_summ, feed_dict={x: x_init})
+            summary_writer.add_summary(cur_image_side_dec_summ)
             
                 
     if FLAGS.GENERATE:
@@ -194,11 +195,10 @@ with tf.Session() as sess:
             saver.restore(sess, FLAGS.MODEL_PATH)
             print("Model restored for generating new images.")
 
-            z_noise = np.random.randn(FLAGS.NUMBER_IMAGES_GENERATED,FLAGS.LATENT_SPACE_SIZE)
+            z_noise = np.random.randn(FLAGS.NUMBER_IMAGES_GENERATED, FLAGS.LATENT_SPACE_SIZE)
             cur_image_gen_summ = sess.run(image_gen_summ, feed_dict={z: z_noise})
             summary_writer.add_summary(cur_image_gen_summ)
 
 
-            
     print("Done.\n")    
 
