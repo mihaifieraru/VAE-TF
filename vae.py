@@ -38,16 +38,17 @@ flags.DEFINE_integer('LATENT_SPACE_SIZE', 20, 'Size of the latent space ')
 
 flags.DEFINE_float('ADAGRAD_LR', 0.01, 'Learning rate Adagrad')   # Try with {0.01, 0.02, 0.1}
 flags.DEFINE_integer('MINIBATCH_SIZE', 100, 'Size of minibatch')
-flags.DEFINE_integer('NUMBER_ITERATIONS', 1000, 'Number of iterations for optimization')
+flags.DEFINE_integer('NUMBER_ITERATIONS', 100000, 'Number of iterations for optimization')
 
 flags.DEFINE_float('INIT_STD_DEV', 0.01, 'Standard deviation for the truncated normal used for initializing the weights')
 
 flags.DEFINE_boolean('TRAIN', True, 'If False, uses saved parameters instead of training')
-flags.DEFINE_boolean('TEST', True, 'If False, does not do testing')
+flags.DEFINE_boolean('TEST_THE_TRAINING', True, 'If False, it is not testing the training')
+flags.DEFINE_boolean('GENERATE', True, 'If False, does not generate new images')
 
 
-flags.DEFINE_integer('NO_IMG_TO_SHOW', 10, 'Number of images to show in tensorboard')
-flags.DEFINE_integer('NUMBER_IMAGES_GENERATED', 5, 'Number of images to generate from noise')
+flags.DEFINE_integer('NUMBER_IMAGES_TEST_THE_TRAINING', 10, 'Number of images to show in tensorboard')
+flags.DEFINE_integer('NUMBER_IMAGES_GENERATED', 10, 'Number of images to generate from noise')
 
 # In[5]:
 
@@ -69,8 +70,11 @@ def create_b(shape):
 
 # Define Layers
 
+
+
 # Input
 x = tf.placeholder(tf.float32, [None, FLAGS.INPUT_SIZE])
+
 
 # Encoder
 W_x_h_enc = create_W([FLAGS.INPUT_SIZE, FLAGS.HIDDEN_ENCODER_SIZE])
@@ -79,29 +83,32 @@ h_enc = tf.tanh(tf.add(tf.matmul(x, W_x_h_enc), b_x_h_enc))
 
 W_h_mu_enc = create_W([FLAGS.HIDDEN_ENCODER_SIZE, FLAGS.LATENT_SPACE_SIZE])
 b_h_mu_enc = create_b([FLAGS.LATENT_SPACE_SIZE])
-mu_enc = tf.tanh(tf.add(tf.matmul(h_enc, W_h_mu_enc), b_h_mu_enc))
+mu_enc = tf.add(tf.matmul(h_enc, W_h_mu_enc), b_h_mu_enc)
 
 W_h_logsigma2_enc = create_W([FLAGS.HIDDEN_ENCODER_SIZE, FLAGS.LATENT_SPACE_SIZE])
 b_h_logsigma2_enc = create_b([FLAGS.LATENT_SPACE_SIZE])
-logsigma2_enc = tf.tanh(tf.add(tf.matmul(h_enc, W_h_logsigma2_enc), b_h_logsigma2_enc))
+logsigma2_enc = tf.add(tf.matmul(h_enc, W_h_logsigma2_enc), b_h_logsigma2_enc)
+
 
 # Sampler
 eps_enc = tf.random_normal(shape=tf.shape(mu_enc))
 sigma_enc = tf.exp(0.5 * logsigma2_enc)
 z = tf.add(tf.mul(sigma_enc, eps_enc), mu_enc)
 
+
 # Decoder
 W_z_h_dec = create_W([FLAGS.LATENT_SPACE_SIZE, FLAGS.HIDDEN_DECODER_SIZE])
 b_z_h_dec = create_b([FLAGS.HIDDEN_DECODER_SIZE])
 h_dec = tf.tanh(tf.add(tf.matmul(z, W_z_h_dec), b_z_h_dec))
 
-W_h_x_dec = create_W([FLAGS.HIDDEN_DECODER_SIZE, FLAGS.INPUT_SIZE])
-b_h_x_dec = create_b([FLAGS.INPUT_SIZE])
-x_dec = tf.add(tf.matmul(h_dec, W_h_x_dec), b_h_x_dec)
+W_h_y_dec = create_W([FLAGS.HIDDEN_DECODER_SIZE, FLAGS.INPUT_SIZE])
+b_h_y_dec = create_b([FLAGS.INPUT_SIZE])
+y_dec = tf.add(tf.matmul(h_dec, W_h_y_dec), b_h_y_dec)
+x_dec = tf.sigmoid(y_dec)
 
-log_p_x_z = tf.reduce_sum(-tf.nn.sigmoid_cross_entropy_with_logits(x_dec, x), reduction_indices=1)
+
+log_p_x_z = tf.reduce_sum(-tf.nn.sigmoid_cross_entropy_with_logits(y_dec, x), reduction_indices=1)
 KL_q_z_x_vs_p_z = - 0.5 * tf.reduce_sum(1 + logsigma2_enc - tf.square(mu_enc) - tf.square(sigma_enc) , reduction_indices=1)
-
 
 # In[8]:
 
@@ -120,13 +127,13 @@ train_it = tf.train.AdagradOptimizer(learning_rate=FLAGS.ADAGRAD_LR).minimize(lo
 loss_summ = tf.scalar_summary("loss", loss)
 
 reshaped_x_init = tf.reshape(x, [FLAGS.MINIBATCH_SIZE, 28, 28, 1])
-image_input_summ = tf.image_summary("image_input", reshaped_x_init, FLAGS.NO_IMG_TO_SHOW)
+image_input_summ = tf.image_summary("input", reshaped_x_init, FLAGS.NUMBER_IMAGES_TEST_THE_TRAINING)
 
 reshaped_x_dec = tf.reshape(x_dec, [FLAGS.MINIBATCH_SIZE, 28, 28, 1])
-image_dec_summ = tf.image_summary("image_dec", reshaped_x_dec, FLAGS.NO_IMG_TO_SHOW)
+image_dec_summ = tf.image_summary("decoded", reshaped_x_dec, FLAGS.NUMBER_IMAGES_TEST_THE_TRAINING)
 
 reshaped_x_gen = tf.reshape(x_dec, [FLAGS.NUMBER_IMAGES_GENERATED, 28, 28, 1])
-image_gen_summ = tf.image_summary("image_gen", reshaped_x_gen, FLAGS.NUMBER_IMAGES_GENERATED)
+image_gen_summ = tf.image_summary("generated", reshaped_x_gen, FLAGS.NUMBER_IMAGES_GENERATED)
 
 summary = tf.merge_all_summaries()
 
@@ -144,6 +151,7 @@ saver = tf.train.Saver()
 with tf.Session() as sess:
     summary_writer = tf.train.SummaryWriter('logs', graph=sess.graph)
     
+
     if FLAGS.TRAIN:
         print("Training phase.")
         if os.path.isfile(FLAGS.MODEL_PATH):
@@ -163,26 +171,34 @@ with tf.Session() as sess:
                 print("Iteration {0} | Loss: {1}".format(it + 1, cur_loss))
         print("")
         
-    if FLAGS.TEST:
-        print("Testing phase.")
+
+    if FLAGS.TEST_THE_TRAINING:
+        print("Testing the training phase.")
         if not os.path.isfile(FLAGS.MODEL_PATH):
             print("No model found. Please add training phase.")
         else:    
             saver.restore(sess, FLAGS.MODEL_PATH)
-            print("Model restored.")
+            print("Model restored for testing the training.")
             
             x_init = mnist.test.next_batch(FLAGS.MINIBATCH_SIZE)[0]
-            cur_x_dec, cur_image_input_summ, cur_image_dec_summ = sess.run([x_dec, image_input_summ, image_dec_summ], feed_dict={x: x_init})
-            
+            cur_image_input_summ, cur_image_dec_summ = sess.run([image_input_summ, image_dec_summ], feed_dict={x: x_init})
             summary_writer.add_summary(cur_image_input_summ)
             summary_writer.add_summary(cur_image_dec_summ)
-                
-            print("Generating images.")
-            z_noise = np.random.randn(FLAGS.NUMBER_IMAGES_GENERATED,FLAGS.LATENT_SPACE_SIZE)
-            x_generated, cur_image_gen_summ = sess.run([x_dec, image_gen_summ], feed_dict={z: z_noise})
             
+                
+    if FLAGS.GENERATE:
+        print("Generate images phase.")
+        if not os.path.isfile(FLAGS.MODEL_PATH):
+            print("No model found. Please add training phase.")
+        else:
+            saver.restore(sess, FLAGS.MODEL_PATH)
+            print("Model restored for generating new images.")
+
+            z_noise = np.random.randn(FLAGS.NUMBER_IMAGES_GENERATED,FLAGS.LATENT_SPACE_SIZE)
+            cur_image_gen_summ = sess.run(image_gen_summ, feed_dict={z: z_noise})
             summary_writer.add_summary(cur_image_gen_summ)
 
+
             
-        print("Done.\n")    
+    print("Done.\n")    
 
