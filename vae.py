@@ -47,8 +47,8 @@ flags.DEFINE_boolean('TEST_THE_TRAINING', True, 'If False, it is not testing the
 flags.DEFINE_boolean('GENERATE', True, 'If False, does not generate new images')
 
 
-flags.DEFINE_integer('NUMBER_IMAGES_TEST_THE_TRAINING', 5, 'Number of images to show in tensorboard')
-flags.DEFINE_integer('NUMBER_IMAGES_GENERATED', 100, 'Number of images to generate from noise')
+flags.DEFINE_integer('NUMBER_IMAGES_TEST_THE_TRAINING', 10, 'Number of images to show in tensorboard')
+flags.DEFINE_integer('NUMBER_IMAGES_GENERATED', 10, 'Number of images to generate from noise')
 
 # In[5]:
 
@@ -70,8 +70,11 @@ def create_b(shape):
 
 # Define Layers
 
+
+
 # Input
 x = tf.placeholder(tf.float32, [None, FLAGS.INPUT_SIZE])
+
 
 # Encoder
 W_x_h_enc = create_W([FLAGS.INPUT_SIZE, FLAGS.HIDDEN_ENCODER_SIZE])
@@ -86,10 +89,12 @@ W_h_logsigma2_enc = create_W([FLAGS.HIDDEN_ENCODER_SIZE, FLAGS.LATENT_SPACE_SIZE
 b_h_logsigma2_enc = create_b([FLAGS.LATENT_SPACE_SIZE])
 logsigma2_enc = tf.add(tf.matmul(h_enc, W_h_logsigma2_enc), b_h_logsigma2_enc)
 
+
 # Sampler
 eps_enc = tf.random_normal(shape=tf.shape(mu_enc))
 sigma_enc = tf.exp(0.5 * logsigma2_enc)
 z = tf.add(tf.mul(sigma_enc, eps_enc), mu_enc)
+
 
 # Decoder
 W_z_h_dec = create_W([FLAGS.LATENT_SPACE_SIZE, FLAGS.HIDDEN_DECODER_SIZE])
@@ -101,9 +106,9 @@ b_h_y_dec = create_b([FLAGS.INPUT_SIZE])
 y_dec = tf.add(tf.matmul(h_dec, W_h_y_dec), b_h_y_dec)
 x_dec = tf.sigmoid(y_dec)
 
+
 log_p_x_z = tf.reduce_sum(-tf.nn.sigmoid_cross_entropy_with_logits(y_dec, x), reduction_indices=1)
 KL_q_z_x_vs_p_z = - 0.5 * tf.reduce_sum(1 + logsigma2_enc - tf.square(mu_enc) - tf.square(sigma_enc) , reduction_indices=1)
-
 
 # In[8]:
 
@@ -146,6 +151,7 @@ saver = tf.train.Saver()
 with tf.Session() as sess:
     summary_writer = tf.train.SummaryWriter('logs', graph=sess.graph)
     
+
     if FLAGS.TRAIN:
         print("Training phase.")
         if os.path.isfile(FLAGS.MODEL_PATH):
@@ -165,6 +171,7 @@ with tf.Session() as sess:
                 print("Iteration {0} | Loss: {1}".format(it + 1, cur_loss))
         print("")
         
+
     if FLAGS.TEST_THE_TRAINING:
         print("Testing the training phase.")
         if not os.path.isfile(FLAGS.MODEL_PATH):
@@ -177,6 +184,7 @@ with tf.Session() as sess:
             cur_image_input_summ, cur_image_dec_summ = sess.run([image_input_summ, image_dec_summ], feed_dict={x: x_init})
             summary_writer.add_summary(cur_image_input_summ)
             summary_writer.add_summary(cur_image_dec_summ)
+            
                 
     if FLAGS.GENERATE:
         print("Generate images phase.")
