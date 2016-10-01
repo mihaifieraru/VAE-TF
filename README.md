@@ -1,4 +1,4 @@
-### Implementation of the Variational Auto Encoder in Tensorflow
+## Implementation of the Variational Auto Encoder in Tensorflow
 
 Requires TensorFlow r0.11
 
@@ -25,12 +25,12 @@ python vae.py --TRAIN=False
 The log files (events) will be stored in the logs/ folder.
 After running the program, vizualize the results (initial vs decoded images and images generated from noise) in tensorboard by reading the events in the logs/ folder:
 ```
-	tensorboard --logdir=logs
+tensorboard --logdir=logs
 ```
 Open the generated URL in the browser and navigate to IMAGES. 
 
 
-## License
+### License
 ```
 The MIT License (MIT)
 Copyright (c) 2016 Mihai Fieraru, Alina Dima
